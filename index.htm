@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Marathi WSD — Sense Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #12121a;
+    --card:      #1a1a26;
+    --border:    #2a2a40;
+    --accent:    #f5a623;
+    --accent2:   #e05a8a;
+    --accent3:   #4ecdc4;
+    --text:      #e8e8f0;
+    --muted:     #6b6b8a;
+    --best:      #4ecdc4;
+    --font-head: 'Playfair Display', serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-mr:   'Noto Sans Devanagari', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mr);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(245,166,35,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,166,35,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glowing orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.18;
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  .orb-1 { width:500px; height:500px; background:#f5a623; top:-150px; left:-150px; }
+  .orb-2 { width:400px; height:400px; background:#e05a8a; bottom:-100px; right:-100px; animation-delay:-6s; }
+  .orb-3 { width:300px; height:300px; background:#4ecdc4; top:50%; left:60%; animation-delay:-3s; }
+
+  @keyframes drift {
+    from { transform: translate(0,0) scale(1); }
+    to   { transform: translate(30px,20px) scale(1.05); }
+  }
+
+  /* Layout */
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 56px;
+    animation: fadeUp 0.8s ease both;
+  }
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(245,166,35,0.1);
+    border: 1px solid rgba(245,166,35,0.3);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .logo-badge span { width:6px; height:6px; background:var(--accent); border-radius:50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  h1 {
+    font-family: var(--font-head);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 900;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #f5a623 0%, #e05a8a 50%, #4ecdc4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+  .subtitle {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* Input card */
+  .input-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.8s 0.1s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+  .input-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+
+  .input-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  textarea {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: var(--text);
+    font-family: var(--font-mr);
+    font-size: 18px;
+    line-height: 1.6;
+    resize: none;
+    height: 80px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(245,166,35,0.1);
+  }
+  textarea::placeholder { color: var(--muted); font-size: 15px; }
+
+  .btn-analyze {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 12px;
+    padding: 0 28px;
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    white-space: nowrap;
+    text-transform: uppercase;
+    min-width: 120px;
+  }
+  .btn-analyze:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(245,166,35,0.3);
+  }
+  .btn-analyze:active:not(:disabled) { transform: translateY(0); }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Example chips */
+  .examples {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .examples-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 14px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font-mr);
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Error */
+  .error-box {
+    background: rgba(224,90,138,0.1);
+    border: 1px solid rgba(224,90,138,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: var(--accent2);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  /* Results */
+  #results { animation: fadeUp 0.5s ease both; }
+
+  .result-block {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .result-block::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent3), var(--accent2));
+  }
+
+  .word-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .word-tag {
+    font-family: var(--font-mr);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .predicted-badge {
+    background: rgba(78,205,196,0.12);
+    border: 1px solid rgba(78,205,196,0.35);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent3);
+    letter-spacing: 1px;
+  }
+
+  .best-sense {
+    background: var(--surface);
+    border: 1px solid rgba(78,205,196,0.25);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+  }
+  .best-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .best-gloss {
+    font-size: 17px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .best-sense-id {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* Chart section */
+  .chart-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .sense-bars { display: flex; flex-direction: column; gap: 12px; }
+
+  .sense-row { display: flex; flex-direction: column; gap: 6px; }
+  .sense-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .sense-gloss-text {
+    font-size: 13px;
+    color: var(--muted);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sense-gloss-text.is-best { color: var(--text); font-weight: 600; }
+  .sense-score {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .sense-score.is-best { color: var(--accent3); }
+
+  .bar-track {
+    height: 8px;
+    background: var(--surface);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 100px;
+    background: var(--border);
+    transform-origin: left;
+    transition: width 0.8s cubic-bezier(0.16,1,0.3,1);
+    width: 0%;
+  }
+  .bar-fill.is-best {
+    background: linear-gradient(90deg, var(--accent3), var(--accent));
+    box-shadow: 0 0 12px rgba(78,205,196,0.4);
+  }
+  .sense-id-chip {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    flex-shrink: 0;
+  }
+  .sense-id-chip.is-best { border-color: rgba(78,205,196,0.3); color: var(--accent3); }
+
+  /* Loader */
+  .loader {
+    display: none;
+    text-align: center;
+    padding: 48px;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader-text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* Stats strip */
+  .stats-strip {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    animation: fadeUp 0.8s 0.2s ease both;
+  }
+  .stat-card {
+    flex: 1;
+    min-width: 140px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .stat-val {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(20px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+
+  /* API URL note */
+  .api-note {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: fadeUp 0.8s 0.15s ease both;
+  }
+  .api-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; flex-shrink:0; box-shadow:0 0 8px #4ade80; }
+  #api-url-display { color: var(--accent3); }
+
+  @media(max-width:600px) {
+    .input-row { flex-direction: column; }
+    .btn-analyze { height: 52px; }
+  }
+</style>
+</head>
+<body>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-badge"><span></span>MuRIL · Contrastive WSD</div>
+    <h1>Marathi Sense Analyzer</h1>
+    <p class="subtitle">Word Sense Disambiguation · मराठी भाषा विश्लेषण</p>
+  </header>
+
+  <!-- API status -->
+  <div class="api-note">
+    <div class="api-dot"></div>
+    Connected to <span id="api-url-display">http://localhost:8000</span>
+    &nbsp;·&nbsp; Change: <input id="api-url-input" value="http://localhost:8000"
+      style="background:transparent;border:none;border-bottom:1px solid var(--border);
+             color:var(--accent3);font-family:var(--font-mono);font-size:11px;
+             width:200px;outline:none;padding:2px 4px;"
+      oninput="document.getElementById('api-url-display').textContent=this.value"/>
+  </div>
+
+  <!-- Stats strip (populated after first call) -->
+  <div class="stats-strip" id="stats-strip" style="display:none">
+    <div class="stat-card">
+      <div class="stat-val" id="stat-words">—</div>
+      <div class="stat-label">Words detected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-senses">—</div>
+      <div class="stat-label">Senses compared</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-conf">—</div>
+      <div class="stat-label">Top confidence</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-margin">—</div>
+      <div class="stat-label">Score margin</div>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-card">
+    <span class="input-label">मराठी वाक्य प्रविष्ट करा · Enter Marathi sentence</span>
+    <div class="input-row">
+      <textarea id="sentence-input"
+        placeholder="उदा. शहरात नवीन मार्ग बांधकाम सुरू आहे"
+        rows="2"></textarea>
+      <button class="btn-analyze" id="analyze-btn" onclick="analyze()">Analyze</button>
+    </div>
+    <div class="examples">
+      <span class="examples-label">Try:</span>
+      <span class="chip" onclick="setExample(this)">शहरात नवीन मार्ग बांधकाम सुरू आहे</span>
+      <span class="chip" onclick="setExample(this)">त्याने चांगले काम केले</span>
+      <span class="chip" onclick="setExample(this)">पाण्याचा प्रवाह वेगाने वाहत होता</span>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="error-box"></div>
+
+  <!-- Loader -->
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <div class="loader-text">Analyzing senses…</div>
+  </div>
+
+  <!-- Results -->
+  <div id="results"></div>
+
+</div>
+
+<script>
+  const API = () => document.getElementById('api-url-input').value.replace(/\/$/, '');
+
+  function setExample(el) {
+    document.getElementById('sentence-input').value = el.textContent.trim();
+  }
+
+  document.getElementById('sentence-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); analyze(); }
+  });
+
+  async function analyze() {
+    const sentence = document.getElementById('sentence-input').value.trim();
+    if (!sentence) return;
+
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    document.getElementById('loader').style.display = 'block';
+    document.getElementById('results').innerHTML = '';
+    document.getElementById('error-box').style.display = 'none';
+    document.getElementById('stats-strip').style.display = 'none';
+
+    try {
+      const res = await fetch(`${API()}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sentence })
+      });
+
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+
+      if (data.error) {
+        showError(data.error);
+      } else {
+        renderResults(data);
+      }
+    } catch (err) {
+      showError(`Cannot reach API at ${API()}. Make sure uvicorn is running.\n${err.message}`);
+    } finally {
+      btn.disabled = false;
+      document.getElementById('loader').style.display = 'none';
+    }
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('error-box');
+    box.textContent = '⚠ ' + msg;
+    box.style.display = 'block';
+  }
+
+  function renderResults(data) {
+    const container = document.getElementById('results');
+    container.innerHTML = '';
+
+    const results = data.results;
+    if (!results || results.length === 0) {
+      showError('No ambiguous words found in this sentence.');
+      return;
+    }
+
+    // Update stats strip
+    const totalSenses = results.reduce((a, r) => a + r.all_senses.length, 0);
+    const topScore    = Math.max(...results.map(r => r.all_senses[0].score));
+    const margins     = results.map(r => {
+      const s = r.all_senses;
+      return s.length > 1 ? s[0].score - s[1].score : s[0].score;
+    });
+    const topMargin   = Math.max(...margins);
+
+    document.getElementById('stat-words').textContent   = results.length;
+    document.getElementById('stat-senses').textContent  = totalSenses;
+    document.getElementById('stat-conf').textContent    = (topScore * 100).toFixed(1) + '%';
+    document.getElementById('stat-margin').textContent  = (topMargin * 100).toFixed(1) + '%';
+    document.getElementById('stats-strip').style.display = 'flex';
+
+    // Render each word result
+    results.forEach((r, idx) => {
+      const block = document.createElement('div');
+      block.className = 'result-block';
+      block.style.animationDelay = `${idx * 0.08}s`;
+
+      const maxScore = Math.max(...r.all_senses.map(s => s.score));
+      const minScore = Math.min(...r.all_senses.map(s => s.score));
+      const range    = maxScore - minScore || 1;
+
+      const barsHTML = r.all_senses.map(sense => {
+        const pct      = ((sense.score - minScore) / range * 85 + 15).toFixed(1);
+        const isBest   = sense.is_best;
+        const bestCls  = isBest ? 'is-best' : '';
+        const gloss    = sense.gloss || `Sense ${sense.sense_id}`;
+        const shortG   = gloss.length > 60 ? gloss.slice(0, 58) + '…' : gloss;
+        return `
+          <div class="sense-row">
+            <div class="sense-meta">
+              <span class="sense-id-chip ${bestCls}">${sense.sense_id}</span>
+              <span class="sense-gloss-text ${bestCls}" title="${gloss}">${shortG}</span>
+              <span class="sense-score ${bestCls}">${(sense.score * 100).toFixed(2)}%</span>
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill ${bestCls}" data-pct="${pct}"></div>
+            </div>
+          </div>`;
+      }).join('');
+
+      block.innerHTML = `
+        <div class="word-header">
+          <span class="word-tag">${r.word}</span>
+          <span class="predicted-badge">PREDICTED SENSE · ${r.predicted_sense}</span>
+        </div>
+        <div class="best-sense">
+          <div class="best-label">✦ Best matching sense</div>
+          <div class="best-gloss">${r.predicted_gloss || '—'}</div>
+          <div class="best-sense-id">sense_id: ${r.predicted_sense}</div>
+        </div>
+        <div class="chart-label">All sense scores</div>
+        <div class="sense-bars">${barsHTML}</div>
+      `;
+
+      container.appendChild(block);
+
+      // Animate bars after render
+      requestAnimationFrame(() => {
+        block.querySelectorAll('.bar-fill').forEach(bar => {
+          const pct = bar.dataset.pct;
+          setTimeout(() => { bar.style.width = pct + '%'; }, 100);
+        });
+      });
+    });
+  }
+</script>
+</body>
+</html>

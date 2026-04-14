@@ -1,0 +1,6 @@
+*.pt
+marathi_wsd_deployment/
+__pycache__/
+*.pyc
+venv/
+.env
