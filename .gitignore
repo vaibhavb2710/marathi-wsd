@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 venv/
 .env
+Models_tested/
+Documents/
+Dataset_Preparetion/
+Data_Set/
